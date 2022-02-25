@@ -1,0 +1,37 @@
+CXXFLAGS += -Wall -Wextra
+
+SRC := midi.cpp
+SRC := $(addprefix src/,$(SRC))
+
+OBJ := $(SRC:%.cpp=%.o)
+DEP := $(OBJ:%.o=%.d)
+ASM := $(OBJ:%.o=%.asm)
+DWO := $(OBJ:%.o=%.dwo)
+PREPROCESSED := $(OBJ:%.o=%.ii)
+
+.PHONY: all jwmidi clean preprocessed asm
+
+all: jwmidi
+
+jwmidi: libjwmidi.a
+
+preprocessed: $(PREPROCESSED)
+
+asm: $(ASM)
+
+clean:
+	rm -f $(OBJ) $(DEP) $(ASM) $(DWO) $(PREPROCESSED) libjwmidi.a
+
+libjwmidi.a: $(OBJ)
+	$(AR) scru $@ $^
+
+%.asm: %.cpp
+	$(CXX) $(CXXFLAGS) -S -o $@ -c $< $(PIPECMD)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -o $@ -MP -MD -c $< $(PIPECMD)
+
+%.ii: %.cpp
+	$(CXX) $(CXXFLAGS) -E -o $@ -c $<
+
+-include $(DEP)

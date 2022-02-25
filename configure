@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+
+set -e
+
+readonly src=$(cd $(dirname "$0") && pwd)
+
+source $src/tools/jwbuild/jwbuild.sh
+
+save_vars CXX AR CXXFLAGS
+
+# Parse options
+
+if test_option help; then
+	cat <<- EOF
+	Recognized options:
+	  --host=<...>           toolchain program prefix, eg. "i386-pc-msdosdjgpp"
+	  --jwmidi-config=<...>  location of configuration header
+	  --with-jwutil=<...>    location of jwutil "build" dir (where you
+	                           invoked 'configure')
+	  --with-jwdpmi=<...>    location of jwdpmi "build" dir (optional)
+	  --debug=no             disable debug mode
+
+	Important variables:
+	  CXXFLAGS               compiler flags
+	  CXX                    compiler command      (if --host not specified)
+	  AR                     'ar' archiver command (if --host not specified)
+	EOF
+	exit 1
+fi
+
+# Check debug flag
+
+if test_option debug yes; then
+	debug_flag='-D_DEBUG'
+else
+	debug_flag='-DNDEBUG'
+fi
+CXXFLAGS+=" $debug_flag"
+
+# Set CXX/AR
+
+host=${options[host]}
+if [[ ! -z "$host" ]]; then
+	CXX="$host-g++"
+	AR="$host-ar"
+fi
+CXX=${CXX:-g++}
+AR=${AR:-ar}
+
+check_programs $CXX $AR
+check_compiler -std=gnu++20
+
+# Set CXXFLAGS
+
+unset more_cxxflags
+more_cxxflags+=" -I$src/include"
+more_cxxflags+=" -iquote $(pwd)/include"
+more_cxxflags+=" $debug_flag"
+prepend CXXFLAGS "$more_cxxflags"
+
+check_compiler
+
+# Find jwutil
+
+CXXFLAGS+=" $(read_flags "${options[with-jwutil]}/cxxflags")"
+cat <<- EOF | compile -E || fail "jwutil not found"
+#include <jw/common.h>
+EOF
+
+# Find jwdpmi
+
+if [[ ! -z "${options[with-jwdpmi]}" ]]; then
+	CXXFLAGS+=" $(read_flags "${options[with-jwdpmi]}/cxxflags")"
+	cat <<- EOF | compile -E || fail "jwdpmi not found"
+	#include <jw/thread.h>
+	EOF
+fi
+
+# Find config header
+
+config_file="${options[jwmidi-config]}"
+if [[ -z "$config_file" ]]; then
+	warn "no configuration header specified, using default."
+	config_file="$src/jwmidi_config.h"
+fi
+config_file="$(realpath "$config_file")"
+config_file="$(winpath "$config_file")"
+cat <<- EOF | compile -E || fail "configuration header not found"
+#include "$config_file"
+EOF
+
+# Generate config.status
+
+save_config
+
+# Create directories
+
+mkdir -p src/
+mkdir -p include/
+
+# Generate config file wrapper
+
+cat <<- EOF > include/jwmidi_config.h
+#pragma once
+#include "$config_file"
+EOF
+
+# Generate cxxflags
+
+write_cxxflags
+echo $more_cxxflags >> cxxflags
+
+# Generate ldflags
+
+cat <<- EOF >> ldflags
+-L$(pwd)
+-ljwmidi
+EOF
+write_ldflags
+
+
+# Generate dependency lists
+
+write_cxxdeps
+
+cat <<- EOF >> lddeps
+libjwmidi.a
+EOF
+write_lddeps
+
+write_targets
+cat <<- EOF >> targets
+jwmidi
+preprocessed
+asm
+EOF
+
+# Generate Makefile
+
+write_makefile

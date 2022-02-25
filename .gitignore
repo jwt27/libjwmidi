@@ -1,0 +1,6 @@
+build/
+Makefile
+config.status
+cxxflags
+ldflags
+*.a
