@@ -39,7 +39,7 @@ namespace jw::midi
         if (p == nullptr) [[unlikely]]
         {
             p = &list.emplace_back();
-            if constexpr (std::is_same_v<T, ostream_info>)
+            if constexpr (config::rdbuf_never_changes and std::is_same_v<T, ostream_info>)
                 if (dynamic_cast<io::realtime_streambuf*>(stream.rdbuf()) != nullptr)
                     static_cast<ostream_info*>(p)->realtime = true;
         }
@@ -191,8 +191,15 @@ namespace jw::midi
     private:
         void put_realtime(byte a)
         {
-            if (tx.realtime) static_cast<jw::io::realtime_streambuf*>(rdbuf)->put_realtime(a);
-            else rdbuf->sputc(a);
+            if constexpr (config::rdbuf_never_changes)
+            {
+                if (tx.realtime) return static_cast<jw::io::realtime_streambuf*>(rdbuf)->put_realtime(a);
+            }
+            else if (auto* rtbuf = dynamic_cast<io::realtime_streambuf*>(rdbuf))
+            {
+                return rtbuf->put_realtime(a);
+            }
+            rdbuf->sputc(a);
         }
 
         template<unsigned I = 0, typename... T>

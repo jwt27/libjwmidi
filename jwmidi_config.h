@@ -26,6 +26,11 @@ namespace jw::midi::config
     using clock = std::chrono::high_resolution_clock;
     using mutex = std::mutex;
 #   endif
+
+    // Assume that rdbuf() never changes on any ostream used for MIDI
+    // transmission.  This avoids having to do a dynamic_cast for every
+    // outgoing realtime message byte.
+    constexpr bool rdbuf_never_changes = true;
 }
 
 #undef JWDPMI
