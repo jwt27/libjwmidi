@@ -29,16 +29,25 @@ namespace jw::midi
         byte last_status { 0 };
         bool realtime { false };
     };
-    std::list<istream_info> istream_list { };
-    std::list<ostream_info> ostream_list { };
 
-    template <typename S, typename T>
-    static T* get_pword(int i, S& stream, std::list<T>& list)
+    template<typename T>
+    static void delete_pword(std::ios_base::event e, std::ios_base& stream, int i)
+    {
+        if (e != std::ios_base::erase_event) return;
+        void*& p = stream.pword(i);
+        if (p == nullptr) return;
+        delete static_cast<T*>(p);
+        p = nullptr;
+    }
+
+    template <typename T, typename S>
+    static T* get_pword(int i, S& stream)
     {
         void*& p = stream.pword(i);
         if (p == nullptr) [[unlikely]]
         {
-            p = &list.emplace_back();
+            p = new T { };
+            if (stream.iword(i)++ == 0) stream.register_callback(delete_pword<T>, i);
             if constexpr (config::rdbuf_never_changes and std::is_same_v<T, ostream_info>)
                 if (dynamic_cast<io::realtime_streambuf*>(stream.rdbuf()) != nullptr)
                     static_cast<ostream_info*>(p)->realtime = true;
@@ -49,13 +58,13 @@ namespace jw::midi
     static istream_info& rx_state(std::istream& stream)
     {
         static const int i = std::ios_base::xalloc();
-        return *get_pword(i, stream, istream_list);
+        return *get_pword<istream_info>(i, stream);
     }
 
     static ostream_info& tx_state(std::ostream& stream)
     {
         static const int i = std::ios_base::xalloc();
-        return *get_pword(i, stream, ostream_list);
+        return *get_pword<ostream_info>(i, stream);
     }
 
     static constexpr bool is_status(byte b) { return (b & 0x80) != 0; }
