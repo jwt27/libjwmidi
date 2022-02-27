@@ -225,6 +225,11 @@ namespace jw::midi
         timed_message& operator=(const timed_message&) noexcept = default;
         timed_message& operator=(timed_message&&) noexcept = default;
 
+        explicit timed_message(const untimed_message& m, const T& t = default_time()) : untimed_message { m }, time { t } { }
+        explicit timed_message(untimed_message&& m, const T& t = default_time()) : untimed_message { std::move(m) }, time { t } { }
+        timed_message& operator=(const untimed_message&) noexcept = delete;
+        timed_message& operator=(untimed_message&&) noexcept = delete;
+
         template<typename U = T> requires (is_time_point<U>)
         static U default_time() { return T::clock::now(); }
         template<typename U = T> requires (not is_time_point<U>)
