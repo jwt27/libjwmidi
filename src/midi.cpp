@@ -129,11 +129,12 @@ namespace jw::midi
         {
             const byte on = 0x90 | ch;
             const byte off = 0x80 | ch;
-            if (not msg.on and tx.last_status == on)
+            if ((config::optimize_note_off or msg.velocity == 0x40) and not msg.on and tx.last_status == on)
                 put(on, msg.note, 0x00);
             else
                 put(msg.on ? on : off, msg.note, msg.velocity);
         }
+
         void operator()(byte ch, const key_pressure& msg)
         {
             put(0xa0 | ch, msg.note, msg.value);

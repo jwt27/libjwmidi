@@ -38,6 +38,15 @@ namespace jw::midi::config
     // transmission.  This avoids having to do a dynamic_cast for every
     // outgoing realtime message byte.
     constexpr bool rdbuf_never_changes = true;
+
+    // A common optimization is to transmit note-off messages as note-on, with
+    // a velocity of 0.  The receiving end interprets this as a note-off
+    // message with 64 velocity.  This is possible because very few devices
+    // actually implement note-off velocity, and this allows us to take
+    // advantage of running status and omit the status byte when possible.
+    // If set to false, the optimization is only applied when the note-off
+    // velocity is exactly 64.
+    constexpr bool optimize_note_off = true;
 }
 
 #undef JWDPMI
