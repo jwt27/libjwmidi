@@ -18,14 +18,14 @@ namespace jw::midi
 {
     struct istream_info
     {
-        config::mutex mutex { };
+        config::rx_mutex mutex { };
         std::vector<byte> pending_msg { };
         clock::time_point pending_msg_time;
         byte last_status { 0 };
     };
     struct ostream_info
     {
-        config::mutex mutex { };
+        config::tx_mutex mutex { };
         byte last_status { 0 };
         bool realtime { false };
     };
