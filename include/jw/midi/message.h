@@ -253,6 +253,11 @@ namespace jw::midi
     // available yet.
     message try_extract(std::istream& in);
 
+    // Clear running status on an ostream, so that the next transmitted
+    // message will include the status byte.  This is an IO manipulator, it
+    // may be invoked via stream operator <<.
+    std::ostream& clear_status(std::ostream&);
+
     inline std::ostream& operator<<(std::ostream& out, const untimed_message& in) { emit(out, in); return out; }
     inline std::istream& operator>>(std::istream& in, untimed_message& out) { out = extract(in); return in; }
     inline std::istream& operator>>(std::istream& in, message& out) { out = extract(in); return in; }

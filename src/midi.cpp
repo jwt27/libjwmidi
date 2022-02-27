@@ -67,6 +67,14 @@ namespace jw::midi
         return *get_pword<ostream_info>(i, stream);
     }
 
+    std::ostream& clear_status(std::ostream& stream)
+    {
+        auto& tx = tx_state(stream);
+        std::unique_lock lock { tx.mutex };
+        tx.last_status = 0;
+        return stream;
+    }
+
     static constexpr bool is_status(byte b) { return (b & 0x80) != 0; }
     static constexpr bool is_realtime(byte b) { return b >= 0xf8; }
     static constexpr bool is_system(byte b) { return b >= 0xf0; }
