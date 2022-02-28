@@ -3,7 +3,7 @@
 
 #pragma once
 #include <vector>
-#include <deque>
+#include <map>
 #include <fstream>
 #include <filesystem>
 #include <jw/midi/message.h>
@@ -12,7 +12,7 @@ namespace jw::midi
 {
     struct file
     {
-        using track = std::deque<timed_message<unsigned>>;
+        using track = std::map<std::uint64_t, std::vector<untimed_message>>;
 
         struct smpte_format
         {

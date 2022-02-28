@@ -277,8 +277,7 @@ namespace jw::midi
         }
     }
 
-    template<typename T>
-    static timed_message<std::remove_cvref_t<T>> realtime_msg(byte status, T time)
+    static untimed_message realtime_msg(byte status)
     {
         switch (status)
         {
@@ -287,15 +286,15 @@ namespace jw::midi
         case 0xfb:
         case 0xfc:
         case 0xfe:
-        case 0xff: return { static_cast<realtime>(status - 0xf8), time };
+        case 0xff: return { static_cast<realtime>(status - 0xf8) };
         case 0xf9:
         case 0xfd: throw io::failure { "invalid status byte" };
         default: __builtin_unreachable();
         }
     }
 
-    template<typename I, typename T>
-    static timed_message<std::remove_cvref_t<T>> make_msg(byte status, I i, T time)
+    template<typename I>
+    static untimed_message make_msg(byte status, I i)
     {
         const unsigned ch = status & 0x0f;
         switch (status & 0xf0)
@@ -310,25 +309,25 @@ namespace jw::midi
                     on = false;
                     vel = 0x40;
                 }
-                return { ch, note_event { i[0], vel, on }, time };
+                return { ch, note_event { i[0], vel, on } };
             }
-        case 0xa0: return { ch, key_pressure     { i[0], i[1] }, time };
-        case 0xb0: return { ch, control_change   { i[0], i[1] }, time };
-        case 0xc0: return { ch, program_change   { i[0] }, time };
-        case 0xd0: return { ch, channel_pressure { i[0] }, time };
-        case 0xe0: return { ch, pitch_change     { { i[0], i[1] } }, time };
+        case 0xa0: return { ch, key_pressure     { i[0], i[1] } };
+        case 0xb0: return { ch, control_change   { i[0], i[1] } };
+        case 0xc0: return { ch, program_change   { i[0] } };
+        case 0xd0: return { ch, channel_pressure { i[0] } };
+        case 0xe0: return { ch, pitch_change     { { i[0], i[1] } } };
         case 0xf0:
             switch (status)
             {
             case 0xf0: __builtin_unreachable();
-            case 0xf1: return { mtc_quarter_frame { i[0] }, time };
-            case 0xf2: return { song_position     { { i[0], i[1] } }, time };
-            case 0xf3: return { song_select       { i[0] }, time };
-            case 0xf6: return { tune_request      { }, time };
+            case 0xf1: return { mtc_quarter_frame { i[0] } };
+            case 0xf2: return { song_position     { { i[0], i[1] } } };
+            case 0xf3: return { song_select       { i[0] } };
+            case 0xf6: return { tune_request      { } };
             case 0xf4:
             case 0xf5:
             case 0xf7: throw io::failure { "invalid status byte" };
-            default: return realtime_msg(status, time);
+            default: return realtime_msg(status);
             }
         default: __builtin_unreachable();
         }
@@ -384,7 +383,7 @@ namespace jw::midi
                 const auto b = get();
                 if (not b) return { };
                 rx.pending_msg_time = clock::now();
-                if (is_realtime(*b)) return realtime_msg(*b, rx.pending_msg_time);
+                if (is_realtime(*b)) return message { realtime_msg(*b), rx.pending_msg_time };
             }
 
             // Check for new status byte
@@ -401,7 +400,7 @@ namespace jw::midi
             {
                 const auto b = get();
                 if (not b) return { };
-                if (is_realtime(*b)) return realtime_msg(*b, clock::now());
+                if (is_realtime(*b)) return message { realtime_msg(*b), clock::now() };
                 if (is_status(*b))
                 {
                     if (is_sysex and *b == 0xf7) break;
@@ -420,7 +419,7 @@ namespace jw::midi
 
             // Construct the message
             if (is_sysex) return { sysex { { rx.pending_msg.cbegin(), rx.pending_msg.cend() } }, rx.pending_msg_time };
-            else return make_msg(status, rx.pending_msg.cbegin() + new_status, rx.pending_msg_time);
+            else return message { make_msg(status, rx.pending_msg.cbegin() + new_status), rx.pending_msg_time };
         }
         catch (const io::failure&)
         {
@@ -579,10 +578,13 @@ namespace jw::midi
         std::array<byte, 8> v;
         bool in_sysex = false;
         byte last_status = 0;
+        std::uint64_t time = 0;
         decltype(meta::channel) meta_ch { };
+
         while (true)
         {
-            const unsigned delta = buf.read_vlq();
+            time += buf.read_vlq();
+            auto& pos = trk.emplace_hint(trk.end(), std::piecewise_construct, std::make_tuple(time), std::make_tuple())->second;
             const byte b = buf.read_8();
             switch (b)
             {
@@ -595,7 +597,7 @@ namespace jw::midi
                     {
                     case 0x00:
                         if (size != 2) throw io::failure { "incorrect message size" };
-                        trk.emplace_back(meta_ch, meta::sequence_number { buf.read_16() });
+                        pos.emplace_back(meta_ch, meta::sequence_number { buf.read_16() });
                         break;
 
                     case 0x01: case 0x02: case 0x03: case 0x04:
@@ -604,7 +606,7 @@ namespace jw::midi
                             meta::text msg { text_type(type), { } };
                             msg.text.resize(size);
                             buf.read(msg.text.data(), size);
-                            trk.emplace_back(meta_ch, std::move(msg), delta);
+                            pos.emplace_back(meta_ch, std::move(msg));
                             break;
                         }
 
@@ -622,14 +624,14 @@ namespace jw::midi
 
                     case 0x51:
                         if (size != 3) throw io::failure { "incorrect message size" };
-                        trk.emplace_back(meta_ch, meta::tempo_change { std::chrono::microseconds { buf.read_24() } }, delta);
+                        pos.emplace_back(meta_ch, meta::tempo_change { std::chrono::microseconds { buf.read_24() } });
                         break;
 
                     case 0x54:
                         {
                             if (size != 5) throw io::failure { "incorrect message size" };
                             buf.read(v.data(), 5);
-                            trk.emplace_back(meta_ch, meta::smpte_offset { v[0], v[1], v[2], v[3], v[4] }, delta);
+                            pos.emplace_back(meta_ch, meta::smpte_offset { v[0], v[1], v[2], v[3], v[4] });
                             break;
                         }
 
@@ -637,7 +639,7 @@ namespace jw::midi
                         {
                             if (size != 4) throw io::failure { "incorrect message size" };
                             buf.read(v.data(), 4);
-                            trk.emplace_back(meta_ch, meta::time_signature { v[0], v[1], v[2], v[3] }, delta);
+                            pos.emplace_back(meta_ch, meta::time_signature { v[0], v[1], v[2], v[3] });
                             break;
                         }
 
@@ -645,7 +647,7 @@ namespace jw::midi
                         {
                             if (size != 2) throw io::failure { "incorrect message size" };
                             buf.read(v.data(), 2);
-                            trk.emplace_back(meta_ch, meta::key_signature { v[0], v[1] != 0 }, delta);
+                            pos.emplace_back(meta_ch, meta::key_signature { v[0], v[1] != 0 });
                             break;
                         }
 
@@ -654,7 +656,7 @@ namespace jw::midi
                             meta::unknown msg { type, { } };
                             msg.data.resize(size);
                             buf.read(msg.data.data(), size);
-                            trk.emplace_back(meta_ch, std::move(msg), delta);
+                            pos.emplace_back(meta_ch, std::move(msg));
                             break;
                         }
                     }
@@ -687,7 +689,7 @@ namespace jw::midi
                             if (i == size) break;
                             [[fallthrough]];
                         case 0xf7:
-                            trk.emplace_back(sysex { std::move(data) }, delta);
+                            pos.emplace_back(sysex { std::move(data) });
                             if (i < size)
                             {
                                 data = { };
@@ -717,12 +719,12 @@ namespace jw::midi
                                     else last_status = status;
                                 }
 
-                                trk.emplace_back(make_msg(status, data.data() + is_status(b), delta));
+                                pos.emplace_back(make_msg(status, data.data() + is_status(b)));
                                 data.clear();
                             }
                         }
                     }
-                    if (data.size() > 0) trk.emplace_back(sysex { std::move(data) }, delta);
+                    if (data.size() > 0) pos.emplace_back(sysex { std::move(data) });
                     last_status = 0;
                     break;
                 }
@@ -733,12 +735,12 @@ namespace jw::midi
                     meta_ch.reset();
                     const std::size_t size = buf.read_vlq();
                     sysex msg { };
-                    msg.data.push_back(0xf0);
                     msg.data.resize(size + 1);
+                    msg.data[0] = 0xf0;
                     buf.read(msg.data.data() + 1, size);
                     in_sysex = true;
                     if (msg.data.back() == 0xf7) in_sysex = false;
-                    trk.emplace_back(std::move(msg), delta);
+                    pos.emplace_back(std::move(msg));
                     break;
                 }
 
@@ -766,7 +768,7 @@ namespace jw::midi
                         else last_status = status;
                     }
 
-                    trk.emplace_back(make_msg(status, i, delta));
+                    pos.emplace_back(make_msg(status, i));
                     break;
                 }
             }
