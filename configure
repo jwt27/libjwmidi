@@ -10,6 +10,9 @@ save_vars CXX AR CXXFLAGS
 
 # Parse options
 
+option_default help no
+option_default debug yes
+
 if test_option help; then
 	cat <<- EOF
 	Recognized options:
@@ -30,7 +33,7 @@ fi
 
 # Check debug flag
 
-if test_option debug yes; then
+if test_option debug; then
 	debug_flag='-D_DEBUG'
 else
 	debug_flag='-DNDEBUG'
