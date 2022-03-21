@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-
-readonly src=$(cd $(dirname "$0") && pwd)
-
-source $src/tools/jwbuild/jwbuild.sh
+source $(dirname "${BASH_SOURCE[0]}")/tools/jwbuild/jwbuild.sh
 
 save_vars CXX AR CXXFLAGS
 
