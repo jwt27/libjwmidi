@@ -1,18 +1,12 @@
 /* * * * * * * * * * * * * * * * * * jwmidi * * * * * * * * * * * * * * * * * */
 /*    Copyright (C) 2022 - 2023 J.W. Jagersma, see COPYING.txt for details    */
 
-#include <list>
-#include <mutex>
-#include <cxxabi.h>
 #include <jw/midi/message.h>
 #include <jw/midi/file.h>
 #include <jw/io/realtime_streambuf.h>
-
-#if __has_include(<jw/thread.h>)
-#define JWDPMI
-#include <jw/thread.h>
-#include <jw/main.h>
-#endif
+#include <list>
+#include <mutex>
+#include <cxxabi.h>
 
 namespace jw::midi
 {
