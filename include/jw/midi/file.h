@@ -1,5 +1,5 @@
-/* * * * * * * * * * * * * * libjwmidi * * * * * * * * * * * * * */
-/* Copyright (C) 2022 J.W. Jagersma, see COPYING.txt for details */
+/* * * * * * * * * * * * * * * * * * jwmidi * * * * * * * * * * * * * * * * * */
+/*    Copyright (C) 2022 - 2023 J.W. Jagersma, see COPYING.txt for details    */
 
 #pragma once
 #include <vector>
