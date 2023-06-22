@@ -1,5 +1,5 @@
-/* * * * * * * * * * * * * * libjwmidi * * * * * * * * * * * * * */
-/* Copyright (C) 2022 J.W. Jagersma, see COPYING.txt for details */
+/* * * * * * * * * * * * * * * * * * jwmidi * * * * * * * * * * * * * * * * * */
+/*    Copyright (C) 2022 - 2023 J.W. Jagersma, see COPYING.txt for details    */
 
 #include <list>
 #include <mutex>
@@ -117,10 +117,6 @@ namespace jw::midi
                 if (size > 0) [[likely]]
                     rdbuf->sputn(reinterpret_cast<const char*>(begin), size);
             }
-#           ifdef JWDPMI
-            catch (const terminate_exception&) { throw; }
-            catch (const detail::abort_thread&) { throw; }
-#           endif
             catch (const abi::__forced_unwind&) { throw; }
             catch (...) { out._M_setstate(std::ios::badbit); }
         }
@@ -434,10 +430,6 @@ namespace jw::midi
             throw io::failure { "unexpected status byte" };
         }
         catch (const io::end_of_file&) { in._M_setstate(std::ios::eofbit); }
-#       ifdef JWDPMI
-        catch (const terminate_exception&) { throw; }
-        catch (const detail::abort_thread&) { throw; }
-#       endif
         catch (const abi::__forced_unwind&) { throw; }
         catch (...) { in._M_setstate(std::ios::badbit); }
         return { };
@@ -805,10 +797,6 @@ namespace jw::midi
         }
         catch (const io::failure&) { in._M_setstate(std::ios::failbit); }
         catch (const io::end_of_file&) { in._M_setstate(std::ios::eofbit); }
-#       ifdef JWDPMI
-        catch (const terminate_exception&) { throw; }
-        catch (const detail::abort_thread&) { throw; }
-#       endif
         catch (const abi::__forced_unwind&) { throw; }
         catch (...) { in._M_setstate(std::ios::badbit); }
         return output;
